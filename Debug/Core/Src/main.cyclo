@@ -1,0 +1,9 @@
+../Core/Src/main.c:68:5:main	1
+../Core/Src/main.c:155:6:SystemClock_Config	3
+../Core/Src/main.c:218:17:GetSector	4
+../Core/Src/main.c:229:6:Flash_Write	2
+../Core/Src/main.c:281:6:Flash_Read	2
+../Core/Src/main.c:306:6:Test1_FlashInChip	6
+../Core/Src/main.c:388:6:Test2_FlashInChip	10
+../Core/Src/main.c:656:5:__io_putchar	1
+../Core/Src/main.c:667:6:Error_Handler	1
