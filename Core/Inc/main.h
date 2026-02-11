@@ -55,6 +55,7 @@ void Error_Handler(void);
 /* USER CODE BEGIN EFP */
 void Test1_FlashInChip(void);
 void Test2_FlashInChip(void);
+void Test3_FlashInChip(void);
 void Flash_Read(uint8_t *RAM_Buffer, uint32_t start_addr, uint32_t bytes_tobe_read);
 void Flash_Write(uint8_t *RAM_Buffer, uint32_t start_addr, uint32_t bytes_tobe_written);
 
@@ -78,7 +79,6 @@ void Flash_Write(uint8_t *RAM_Buffer, uint32_t start_addr, uint32_t bytes_tobe_w
 
 #define ADDR_FLASH_SECTOR_12    ((uint32_t)0x08100000) /* a virtual sector 12, 128 Kbytes, */
 
-#define RAM_BUFFER_SIZE         ((uint32_t)122*1024)   /* STORAGE_BLK_NBR*STORAGE_BLK_SIZ=122KBytes */
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

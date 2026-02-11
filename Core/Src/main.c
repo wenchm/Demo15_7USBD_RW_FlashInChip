@@ -95,46 +95,9 @@ int main(void)
   /* USER CODE BEGIN 2 */
   printf("test Demo15_7 read and write Flash_In_Chip, and used for USBD MSC.\r\n");
 
-
-//  __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
-//                    FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR|FLASH_FLAG_PGSERR);
-//  HAL_FLASH_Unlock();
-
-  // 强制擦除目标扇区（以STM32F4为例）
-//  FLASH_EraseInitTypeDef erase = {
-//          .TypeErase = FLASH_TYPEERASE_SECTORS,
-//          .Sector = FLASH_SECTOR_10,  // 对应0x080A0000的扇区
-//          .NbSectors = 1,
-//          .VoltageRange = FLASH_VOLTAGE_RANGE_3
-//  };
-//  uint32_t sector_error;
-//  if(HAL_FLASHEx_Erase(&erase, &sector_error) !=HAL_OK)
-//	  printf("erase failure.\r\n");
-//  else
-//  	  printf("erase success.\r\n");
-//
-//  // 写入测试数据（带硬件级等待）
-//  uint32_t addr = 0x080C0000;
-//  uint32_t data = 0x12345678;
-//  HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr, data);
-//  while (__HAL_FLASH_GET_FLAG(FLASH_FLAG_BSY)); // 必须等待！
-//
-//  // 内存屏障+强制读取
-//  __DSB();
-//  volatile uint32_t read_data = *(volatile uint32_t*)addr;
-//  HAL_FLASH_Lock();
-//
-//  printf("Addr:0x%08lX 写入:0x%08lX 读取:0x%08lX\n",
-//             addr, data, read_data);
-
-
-// 测试单个双字写入读出
-//  uint64_t test_data = 0x1122334455667788;
-//  HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, 0x080A0000, test_data);
-//  volatile uint64_t read_back = *(volatile uint64_t*)0x080A0000;
-
 //  Test1_FlashInChip();
-  Test2_FlashInChip();
+//  Test2_FlashInChip();
+  Test3_FlashInChip();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -217,6 +180,9 @@ uint8_t FlashSector_Index[12] = {FLASH_SECTOR_0,FLASH_SECTOR_1,FLASH_SECTOR_2,
   */
 static uint32_t GetSector(uint32_t Address)
 {
+	/* Check the parameters */
+	assert_param(IS_FLASH_ADDRESS(Address));
+
 	uint32_t sector = 0;
 	for(uint8_t i=0; i<12; i++)
 		if((Address >=Addr_Index[i]) && (Address <Addr_Index[i+1]))
@@ -225,11 +191,14 @@ static uint32_t GetSector(uint32_t Address)
 	return sector;
 }
 
-
-void Flash_Write(uint8_t *RAM_Buffer, uint32_t start_addr, uint32_t bytes_tobe_written)
+/*
+*  @brief:write flash according to byte address.
+*  @prama start_addr: physic address begin to read,such as 0x08020100.
+*  @param bytes_tobe_rw: total bytes to be write,bytes.
+*  @retval voidֵ
+*/
+void Flash_Write(uint8_t *RAM_Buffer, uint32_t start_addr, uint32_t bytes_tobe_rw)
 {
-	HAL_FLASH_Unlock();
-
 /* erase user area.
  * The user area refers to the space not utilized by the program itself,
  * which can be customized.
@@ -239,78 +208,88 @@ void Flash_Write(uint8_t *RAM_Buffer, uint32_t start_addr, uint32_t bytes_tobe_w
                   FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR|FLASH_FLAG_PGSERR);
 
 	uint32_t StartSector = GetSector(start_addr);
-	uint32_t EndSector = GetSector(start_addr +bytes_tobe_written -1);
+	uint32_t EndSector = GetSector(start_addr +bytes_tobe_rw -1);
 
+	HAL_FLASH_Unlock();
 /* erase sectors or mass********************************/
-	FLASH_EraseInitTypeDef *eraseinit ={};
-	eraseinit->Banks =FLASH_BANK_1;
-	eraseinit->NbSectors =EndSector -StartSector +1;
-//	eraseinit->Sector =FLASH_SECTOR_8 |FLASH_SECTOR_9 |FLASH_SECTOR_10 |FLASH_SECTOR_11;
-	eraseinit->Sector =StartSector;
-	eraseinit->TypeErase =FLASH_TYPEERASE_SECTORS;
-	eraseinit->VoltageRange =FLASH_VOLTAGE_RANGE_3;
-	uint32_t *SectorError =0;
-	HAL_FLASHEx_Erase(eraseinit, SectorError);
-
-/* Write into FLASH in words ********************************/
-  	uint16_t i =0;
-  	uint16_t j =bytes_tobe_written/4;
-
-/* The dynamic pointer points to the first address of the static array.*/
-  	uint8_t buf_write[] ={};
-  	RAM_Buffer =buf_write;
-
-	for(i=0; i<j; i++)
-	{
-		uint32_t add = (uint32_t)(start_addr +i*4);
-//		uint32_t dat = RAM_Buffer[i*8 +0]|(RAM_Buffer[i*8 +1]<<8)|(RAM_Buffer[i*8 +2]<<16)|(RAM_Buffer[i*8 +3]<<24);	//RAM_Buffer[i]=buf_write[i]
-		uint32_t dat = buf_write[i*8 +0]|(buf_write[i*8 +1]<<8)|(buf_write[i*8 +2]<<16)|(buf_write[i*8 +3]<<24);
-		HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, add, dat);
+	FLASH_EraseInitTypeDef eraseinit ={};
+	eraseinit.NbSectors =EndSector -StartSector +1;
+	eraseinit.Sector =StartSector;
+	eraseinit.TypeErase =FLASH_TYPEERASE_SECTORS;
+	eraseinit.VoltageRange =FLASH_VOLTAGE_RANGE_3;
+	uint32_t SectorError =0;
+	if(HAL_FLASHEx_Erase(&eraseinit, &SectorError) !=HAL_OK){
+		printf("erase failure。");	//TEST
 	}
 
+/* Write into FLASH in words ********************************/
+	uint32_t DATA32[bytes_tobe_rw/4] ={};
+	for(uint32_t j=0; j <bytes_tobe_rw/4; j++)
+	{
+		DATA32[j] =RAM_Buffer[j*4+0] |(RAM_Buffer[j*4+1]<<8) |(RAM_Buffer[j*4+2]<<16) |(RAM_Buffer[j*4+3]<<24);
+		printf("data ready, DATA32[0x%08lx] =0x%08lx,\r\n",j,DATA32[j]);//test
+	}
 
+	uint32_t Address =start_addr;
+	uint32_t j =0;
+	while (Address <(uint32_t)(start_addr +bytes_tobe_rw))
+	{
+		if(HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Address, DATA32[j]) == HAL_OK)
+		{
+			printf("写入Address %08lx =%08lx,\r\n",Address,DATA32[j]);	//test
+			Address +=4;	//address alignment
+			j ++;
+		}
+		else
+			Error_Handler();
+	}
+	while (__HAL_FLASH_GET_FLAG(FLASH_FLAG_BSY));
 	HAL_FLASH_Lock();
 }
 
 /*
 *  @brief:read to RAM_Buffer flash according to byte address.
 *  @prama start_addr: physic address begin to read,such as 0x08020100.
-*  @param bytes_tobe_read: total bytes to be read,bytes.
-*  @retval RAM_Bufferֵ
+*  @param bytes_tobe_rw: total bytes to be read,bytes.
+*  @retval voidֵ
 */
-void Flash_Read(uint8_t *RAM_Buffer, uint32_t start_addr, uint32_t bytes_tobe_read)
+void Flash_Read(uint8_t *RAM_Buffer, uint32_t start_addr, uint32_t bytes_tobe_rw)
 {
-  	uint16_t i =0;
-  	uint16_t j =bytes_tobe_read/4;
+	uint32_t Address =start_addr;
+    volatile uint32_t Data32[bytes_tobe_rw/4] ={};	//read in word 32bits
 
-  	for(i=0;i<j;i++)
+    uint32_t j=0;
+  	while(Address <(start_addr +bytes_tobe_rw))
   	{
-  		uint32_t add = (uint32_t)(start_addr +i*4);
-  		uint32_t dat = *(__IO uint32_t *)(add);
+  		__DSB();
+  		Data32[j] = *(volatile uint32_t*)Address;	//Forced read from physical address
+  		RAM_Buffer[j*4+0] =(uint8_t)(Data32[j]&0xFF);
+  		RAM_Buffer[j*4+1] =(uint8_t)((Data32[j]>>8)&0xFF);
+  		RAM_Buffer[j*4+2] =(uint8_t)((Data32[j]>>16)&0xFF);
+  		RAM_Buffer[j*4+3] =(uint8_t)((Data32[j]>>24)&0xFF);
 
-  		RAM_Buffer[i*8 +0]=(uint8_t)(dat&0xFF);
-  		RAM_Buffer[i*8 +1]=(uint8_t)((dat>>8)&0xFF);
-  		RAM_Buffer[i*8 +2]=(uint8_t)((dat>>16)&0xFF);
-  		RAM_Buffer[i*8 +3]=(uint8_t)((dat>>24)&0xFF);
+  		printf("read Address %08lx =%08lx,\r\n", Address, Data32[j]);	//test
+  		Address +=4;	//address alignment
+  		j++;
   	}
-}
+}//Flash_Read
 
 /* end test 6 */
 
 /**
-  * @brief  Test1 read and write flash,
-  * @brief  directly call HAL library functions.
+  * @brief  Test1 read and write flash in word,
+  * @brief  constant.
   * @param  None
-  * @retval 0:OK,-1,ERROR
+  * @retval void
   */
 void Test1_FlashInChip(void)
 {
-	uint32_t StartSector = 0;
-	uint32_t EndSector = 0;
-	uint32_t Address = 0;
+	uint32_t StartSector =0;
+	uint32_t EndSector =0;
+	uint32_t Address =0;
 
-	__IO uint32_t Data32 = 0;
-	__IO uint32_t MemoryProgramStatus = 0;
+	__IO uint32_t Data32 =0;
+	__IO uint32_t MemoryProgramStatus =0;
 
 	HAL_FLASH_Unlock();
 
@@ -384,7 +363,13 @@ void Test1_FlashInChip(void)
 }
 
 
-
+/**
+  * @brief  Test2 read and write flash,
+  * @brief  read and write flash,in bytes, half word, word, double word.
+  * @brief  variable
+  * @param  None
+  * @retval void
+  */
 void Test2_FlashInChip(void)
 {
 	uint32_t StartSector = 0;
@@ -488,7 +473,7 @@ void Test2_FlashInChip(void)
 	for(uint32_t j=0; j <bytes_tobe_rw/8; j++)
 	{
 		/* When shifting left more than 31 bits,
-		 * ensure the operand is 64-bit (such as using uint64_t typecasting)
+		 * ensure the operand is 64-bit (such as using uint64_t type casting)
 		 * avoid 32-bit integer shift truncation.
 		 */
 		DATA64[j] =DATA8[j*8+0] |(DATA8[j*8+1]<<8) |(DATA8[j*8+2]<<16) |(DATA8[j*8+3]<<24) |
@@ -512,23 +497,24 @@ void Test2_FlashInChip(void)
  * HAL_FLASH_Program write fails,
  * and it can only be written successfully after being split into word
  */
- while (Address <(uint32_t)(FLASH_USER_START_ADDR +bytes_tobe_rw))
- {
-//	HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, Address, DATA64[j]);	//Unavailable
-
-	ret2 =HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Address, Li_DATA64[j]);
-	ret1 =HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Address+4, Hi_DATA64[j]);
-
-	if((ret1 ==HAL_OK) &&(ret2 ==HAL_OK))
+	while (Address <(uint32_t)(FLASH_USER_START_ADDR +bytes_tobe_rw))
 	{
-		printf("写入Address %08lx =0x%08lx%08lx,\r\n",Address, Hi_DATA64[j], Li_DATA64[j]);	//test
-	}
+//		HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, Address, DATA64[j]);	//Unavailable
 
-	Address +=8;
-	j ++;
- }
- while (__HAL_FLASH_GET_FLAG(FLASH_FLAG_BSY));
- HAL_FLASH_Lock();
+		ret2 =HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Address, Li_DATA64[j]);
+		ret1 =HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Address+4, Hi_DATA64[j]);
+
+		if((ret1 ==HAL_OK) &&(ret2 ==HAL_OK))
+		{
+			printf("写入Address %08lx =0x%08lx%08lx,\r\n",Address, Hi_DATA64[j], Li_DATA64[j]);	//test
+		}
+
+		Address +=8;
+		j ++;
+	}
+	while (__HAL_FLASH_GET_FLAG(FLASH_FLAG_BSY));
+
+	HAL_FLASH_Lock();
 
 
 /* read from FLASH in bytes, 8bits***************************************/
@@ -651,6 +637,38 @@ void Test2_FlashInChip(void)
   }
 
 }//void Test2_FlashInChip(void)
+
+/**
+  * @brief  Test3 read and write flash in word,
+  * @brief  use function,
+  * @brief  variable
+  * @param  None
+  * @retval void
+  */
+void Test3_FlashInChip(void)
+{
+	//Assert condition
+	uint32_t bytes_tobe_rw =64;	//bytes
+	uint32_t start_addr =FLASH_USER_START_ADDR;
+
+	/* Check the parameters */
+//	assert_param(IS_FLASH_ADDRESS(start_addr));
+
+	//Prepare uint8_t data
+	uint8_t DATA8[bytes_tobe_rw] ={};
+	for(uint16_t i=0; i <bytes_tobe_rw;i++)
+		DATA8[i] =i;
+	printf("数据准备完毕.\r\n");	//test
+
+	//write in word
+	Flash_Write(DATA8, start_addr, bytes_tobe_rw);
+	HAL_Delay(1000);
+
+	//read in word
+	uint8_t RAM_Buffer[bytes_tobe_rw];
+	Flash_Read(RAM_Buffer, start_addr, bytes_tobe_rw);
+
+}//void Test3_FlashInChip(void)
 
 
 int __io_putchar(int ch)
